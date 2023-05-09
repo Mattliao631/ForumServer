@@ -77,3 +77,6 @@ connection_handler.start()
 # 再由 Main Thread 逐一讀取並進行操作
 
 # 主程式邏輯
+while True:
+    time.sleep(5)
+    print('waiting for connection...')

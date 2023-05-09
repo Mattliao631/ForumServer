@@ -4,7 +4,7 @@ import datetime
 class ForumDatabaseCommunicator:
     def __init__(self, database_name):
         self.database_name = database_name
-        self.database_connection = sqlite3.connect(self.database_name, charset='utf-8')
+        self.database_connection = sqlite3.connect(self.database_name)
         self.cursor_obj = self.database_connection.cursor()
         self.message = ""
     # Use Case 1
@@ -65,7 +65,7 @@ class ForumDatabaseCommunicator:
             ''' %(name, password)
         )
         temp = self.cursor_obj.fetchall()
-        if temp == None:
+        if not temp:
             self.message = "{'Message' : 'Sign in 1', 'Datas' : ''}"
         else:
             id = temp[0][0]
@@ -432,10 +432,9 @@ Pet_ExpLimit_on_EachStage = [300, 4000]
 
 
 if __name__ == "__main__":
-    print(1)
-    #FDC_obj = ForumDatabaseCommunicator("Forum_Database.db")
+    FDC_obj = ForumDatabaseCommunicator("Forum_Database.db")
     #FDC_obj.CreateUser(name="1234", password="4568", mail="91011112", time=datetime.datetime.now())
-    #print(FDC_obj.SignIn("123", "456"))
+    print(FDC_obj.SignIn("123efas", "45asd6"))
     #FDC_obj.Search(big_category='Test0', sub_category='Test0-0',tags=('Test1', 'Test2'))
     #FDC_obj.Post(Title='PythonPostTest', Content='C8763++++++++++++++asdflvnbsdlfkasdfvds;jv asf aa', Time=datetime.datetime.now(), AuthorID=0,BigCategory='Test2', SubCategory='Test2-0', Tags=('Test1', 'Test2', 'RenameTest', 'NewTagTest'))
     #FDC_obj.ViewArticle(3)
