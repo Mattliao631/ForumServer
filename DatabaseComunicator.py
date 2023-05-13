@@ -1,5 +1,7 @@
 import sqlite3
 import datetime
+import json
+
 
 class ForumDatabaseCommunicator:
     def __init__(self, database_name):
@@ -13,10 +15,10 @@ class ForumDatabaseCommunicator:
             '''
                 SELECT COUNT(Name)
                 FROM User
-                WHERE Name == %s;
+                WHERE Name == '%s';
             ''' %(name)
         )
-        number_of_same_name = (self.cursor_obj.fetchall())[0][0]
+        number_of_same_name = (self.cursor_obj.fetchone())[0]
         if number_of_same_name == 0:
             self.cursor_obj.execute("SELECT UserID FROM User ORDER BY UserID DESC;")
             temp_record = self.cursor_obj.fetchone()
@@ -48,9 +50,9 @@ class ForumDatabaseCommunicator:
                 ''' %(new_id)
             )
             self.database_connection.commit()
-            self.message = "{'Message' : 'Sign up 0', 'Datas' : ''}"
+            self.message = '''{"Message" : "Sign up 0", "Datas" : ""}'''
         else:
-            self.message = "{'Message' : 'Sign up 1', 'Datas' : ''}"
+            self.message = '''{'Message" : "Sign up 1", "Datas" : ""}'''
         
         #print(self.message)
         return self.message
@@ -66,24 +68,21 @@ class ForumDatabaseCommunicator:
         )
         temp = self.cursor_obj.fetchall()
         if not temp:
-            self.message = "{'Message' : 'Sign in 1', 'Datas' : ''}"
+            t = {"Message" : "Sign in 1", "Datas" : ""}
+            self.message = json.dumps(t)
         else:
             id = temp[0][0]
             self.cursor_obj.execute(
                 '''
-                    SELECT Title, ArticleID, PortraitID, Article.Created_At
+                    SELECT Title, ArticleID, PortraitID
                     FROM Article, User
                     WHERE Article.AuthorID==User.UserID
                     ORDER BY Article.Created_At DESC LIMIT 10;
                 '''
             )
             article_temp = self.cursor_obj.fetchall()
-            self.message = "{'Message' : 'Sign in 0',"
-            self.message += "'Datas' : ['%d'"%(id)
-            for record in article_temp:
-                self.message += ",('%s', '%d', '%d')"%(record[0],record[1],record[2])
-            self.message += ']'
-            self.message += '}'
+            t = {"Message" : "Sign in 0", "Datas" : article_temp}
+            self.message = json.dumps(t)
 
         #print(self.message)
         return self.message
@@ -109,17 +108,12 @@ class ForumDatabaseCommunicator:
         
         print(result_tuples)
         
-        if result_tuples == None:
-            self.message = "{'Message' : 'Search 1', 'Datas' : []}"
+        if not result_tuples:
+            t = {"Message" : "Search 1", "Datas" : []}
+            self.message = json.dumps(t)
         else:
-            self.message = '''
-                {
-                    'Message': 'Search 0',
-                    'Datas' : [
-                        %s
-                    ]
-                }
-            ''' %(','.join("('%s', '%s', '%d')" % tuple[0:3] for tuple in result_tuples))
+            t = {"Message" : "Search 0", "Datas" : result_tuples}
+            self.message = json.dumps(t)
 
         #print(self.message)
         return self.message
@@ -179,13 +173,14 @@ class ForumDatabaseCommunicator:
             value_str += "(%d, '%s'),\n" %(i, tag)
             i+=1
         value_str = value_str[:-2]
-
-        query_str = '''
-            INSERT INTO Tag (TagID, TagName)
-            VALUES
-                %s;
-        ''' %(value_str)
-        self.cursor_obj.execute(query_str)
+        if value_str:
+            query_str = '''
+                INSERT INTO Tag (TagID, TagName)
+                VALUES
+                    %s;
+            ''' %(value_str)
+            #print(query_str)
+            self.cursor_obj.execute(query_str)
         ###self.database_connection.commit()
         # find all matched tag's ID
         self.cursor_obj.execute("SELECT TagID FROM Tag WHERE TagName IN (%s)" %(','.join(map(lambda tag: "'"+tag+"'", Tags))))
@@ -202,12 +197,9 @@ class ForumDatabaseCommunicator:
         ''' %(',\n'.join(map(lambda tag_id: "(%d," %(new_id) + str(tag_id) + ")", tag_ids)))
         self.cursor_obj.execute(query_str)
         self.database_connection.commit()
-        self.message = '''
-            {
-                'Message' : 'Post Article 0',
-                'Datas' : ''
-            }
-        '''
+    
+        t = {"Message" : "Post Article 0", "Datas" : ""}
+        self.message = json.dumps(t)
         return self.message
     
     # Use Case 4
@@ -224,6 +216,7 @@ class ForumDatabaseCommunicator:
         likenum=self.cursor_obj.fetchone()[0]
         article_data.append(likenum)
         #print(article_data)
+        bundle_data = [article_data]
         self.cursor_obj.execute(
             '''
                 SELECT DISTINCT Comment.CommentID, Comment.Content, Comment.CommenterID, User.Name
@@ -233,26 +226,18 @@ class ForumDatabaseCommunicator:
             ''' %(ArticleID)
         )
         comment_temp = self.cursor_obj.fetchall()
-        comment_str = ""
         for comment_tuple in comment_temp:
-            comment_str += "('%d', '%s', '%d', '%s')," %comment_tuple
-        comment_str=comment_str[:-1]
-        article_data.append(comment_str)
-        self.message = '''
-            {
-                'Message' : 'View Article 0',
-                'Datas' : [
-                        ('%s', '%d', '%s', '%d', '%s', '%d'),
-                        %s
-                    ]
-            }
-        ''' %tuple(article_data)
+            bundle_data.append(comment_tuple)
+
+        t = {"Message" : "View Article 0", "Datas" : bundle_data}
+        self.message = json.dumps(t)
+
         return self.message
     
     # Use Case 5
     def Comment(self, ArticleID, UserID, Content, time):
-        self.cursor_obj.execute("SELECT MAX(CommentID) FROM Comment WHERE ArticleID==%d" %(ArticleID))
-        new_id = self.cursor_obj.fetchone()[0] + 1
+        self.cursor_obj.execute("SELECT COUNT(CommentID) FROM Comment WHERE ArticleID==%d" %(ArticleID))
+        new_id = self.cursor_obj.fetchone()[0]
         self.cursor_obj.execute(
             '''
                 INSERT INTO Comment (ArticleID, CommentID, Created_At, CommenterID, Content)
@@ -260,12 +245,8 @@ class ForumDatabaseCommunicator:
             ''' % (ArticleID, new_id, time.strftime("%Y/%m/%d, %H/%M/%S"), UserID, Content)
         )
         self.database_connection.commit()
-        self.message = '''
-            {
-                'Message' : 'Comment 0',
-                'Datas' : ''
-            }
-        '''
+        t = {"Message" : "Comment 0", "Datas" : ""}
+        self.message = json.dumps(t)
         return self.message
     
     # Use Case 6
@@ -307,28 +288,15 @@ class ForumDatabaseCommunicator:
                     ''' %(Amount, pet_temp[1], pet_temp[0])
                 )
                 self.database_connection.commit()
-
-                self.message = '''
-                    {
-                        'Message' : 'Donate 0',
-                        'Datas' : '%d'
-                    }
-                '''  %(cookie - Amount)
+                t = {"Message" : "Donate 0", "Datas" : "%d" %(cookie - Amount)}
+                self.message = json.dumps(t)
             else:
-                self.message = '''
-                    {
-                        'Message' : 'Donate 1',
-                        'Datas': '%d'
-                    }
-                ''' % cookie
+                t = {"Message" : "Donate 1", "Datas" : "%d" %(cookie)}
+                self.message = json.dumps(t)
             
         else:
-            self.message = '''
-                {
-                    'Message' : 'Donate 1',
-                    'Datas' : '-1'
-                }
-            '''
+            t = {"Message" : "Donate 1", "Datas" : "-1"}
+            self.message = json.dumps(t)
         
         #print(self.message)
         return self.message
@@ -340,16 +308,16 @@ class ForumDatabaseCommunicator:
         query_str = ''
         if temp == None:
             query_str = "INSERT INTO Liked_By (ArticleID, UserID) VALUES (%d, %d)" %(ArticleID, UserID)
-            self.message = '''
-                {
-                    'Message' : 'Star 0'
-                    'Datas' : ''
-                }
-            '''
+            t = {"Message" : "Star 0", "Datas" : ""}
+            self.message = json.dumps(t)
         else:
             query_str = "DELETE FROM Liked_By WHERE ArticleID==%d AND UserID==%d" %(ArticleID, UserID)
+            t = {"Message" : "Star 0", "Datas" : "Unstar"}
+            self.message = json.dumps(t)
+        
         self.cursor_obj.execute(query_str)
         self.database_connection.commit()
+        return self.message
 
     #Use Case 9
     def ViewUser(self, UserID):
@@ -361,12 +329,8 @@ class ForumDatabaseCommunicator:
             ''' %(UserID)
         )
         temp = self.cursor_obj.fetchone()
-        self.message = '''
-            {
-                'Message' : 'View User 0',
-                'Datas' : ('%d', '%s', '%s', '%d', '%d', '%s', '%d', '%d')
-            }
-        ''' %temp
+        t = {"Message" : "View User 0", "Datas" : temp}
+        self.message = json.dumps(t)
         return self.message
     
     #Use Case 10
@@ -379,12 +343,8 @@ class ForumDatabaseCommunicator:
             ''' %(NewName, UserID)
         )
         self.database_connection.commit()
-        self.message = '''
-            {
-                'Message' : 'Change User Name 0',
-                'Datas' : ''
-            }
-        '''
+        t = {"Message" : "Change User Name 0", "Datas" : ""}
+        self.message = json.dumps(t)
         return self.message
 
     #Use Case 11
@@ -398,12 +358,8 @@ class ForumDatabaseCommunicator:
         )
         self.database_connection.commit()
 
-        self.message = '''
-            {
-                'Message' : 'Change Self IntroDuction 0',
-                'Datas' : ''
-            }
-        '''
+        t = {"Message" : "Change Self Introduction 0", "Datas" : ""}
+        self.message = json.dumps(t)
         return self.message
     
     #Use Case 12
@@ -417,12 +373,8 @@ class ForumDatabaseCommunicator:
         )
         self.database_connection.commit()
 
-        self.message = '''
-            {
-                'Message' : 'Change Portrait 0',
-                'Datas' : ''
-            }
-        '''
+        t = {"Message" : "Change Portrait 0", "Datas" : ""}
+        self.message = json.dumps(t)
         return self.message
     
 
@@ -433,15 +385,15 @@ Pet_ExpLimit_on_EachStage = [300, 4000]
 
 if __name__ == "__main__":
     FDC_obj = ForumDatabaseCommunicator("Forum_Database.db")
-    #FDC_obj.CreateUser(name="1234", password="4568", mail="91011112", time=datetime.datetime.now())
-    print(FDC_obj.SignIn("123efas", "45asd6"))
-    #FDC_obj.Search(big_category='Test0', sub_category='Test0-0',tags=('Test1', 'Test2'))
-    #FDC_obj.Post(Title='PythonPostTest', Content='C8763++++++++++++++asdflvnbsdlfkasdfvds;jv asf aa', Time=datetime.datetime.now(), AuthorID=0,BigCategory='Test2', SubCategory='Test2-0', Tags=('Test1', 'Test2', 'RenameTest', 'NewTagTest'))
-    #FDC_obj.ViewArticle(3)
-    #FDC_obj.Comment(0, 0, 'EEEEEEERR model', datetime.datetime.now())
-    #FDC_obj.Donate(UserID=0, Amount=50, AuthorID=1)
-    #FDC_obj.Star(UserID=1, ArticleID=3)
-    #print(FDC_obj.ViewUser(1))
-    #print(FDC_obj.ChangeUserName(0, '123999'))
-    #print(FDC_obj.ChangeSelfIntroduction(1, 'change intro test2'))
-    #print(FDC_obj.ChangePortrait(0, 2))
+    #print(FDC_obj.CreateUser(name="T_T", password="Professor Hung is ultimate boss of CSIE", mail="91011112", time=datetime.datetime.now()))
+    #print(FDC_obj.SignIn("1234", "4568"))
+    #print(FDC_obj.Search(big_category='Test2', sub_category='Test2-0',tags=('Test1', 'Test2')))
+    #print(FDC_obj.Post(Title='PythoPosTes', Content='C8763++++++++++++++asdflvnbsdlfkasdfvds;jv asf aa', Time=datetime.datetime.now(), AuthorID=0,BigCategory='Test2', SubCategory='Test2-0', Tags=('Test1', 'Test2', 'RenameTest', 'NewTagTest')))
+    #print(FDC_obj.ViewArticle(4))
+    #print(FDC_obj.Comment(4, 1, 'ER model', datetime.datetime.now()))
+    #print(FDC_obj.Donate(UserID=1, Amount=50, AuthorID=0))
+    #print(FDC_obj.Star(UserID=1, ArticleID=3))
+    #print(FDC_obj.ViewUser(3))
+    #print(FDC_obj.ChangeUserName(3, 'Force us taking complier is nonsense!'))
+    #print(FDC_obj.ChangeSelfIntroduction(3, 'Force us taking complier is nonsense!'))
+    #print(FDC_obj.ChangePortrait(3, 1))

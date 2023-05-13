@@ -8,7 +8,7 @@ class ForumInstructionHandler:
         self.command = jmessage['COMMAND']
         self.datas = jmessage['DATAS']
         self.lock = Lock()
-        self.FDC_obj = ForumDatabaseCommunicator("Forum_Database.db", charset='utf-8')
+        self.FDC_obj = ForumDatabaseCommunicator("Forum_Database.db")
 
     def handle(self):
         self.lock.acquire()
