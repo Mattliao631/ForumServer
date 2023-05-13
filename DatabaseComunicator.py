@@ -50,9 +50,11 @@ class ForumDatabaseCommunicator:
                 ''' %(new_id)
             )
             self.database_connection.commit()
-            self.message = '''{"Message" : "Sign up 0", "Datas" : ""}'''
+            t = '''{"Message" : "Sign up 0", "Datas" : ""}'''
+            self.message = json.dumps(t)
         else:
-            self.message = '''{'Message" : "Sign up 1", "Datas" : ""}'''
+            t = '''{'Message" : "Sign up 1", "Datas" : ""}'''
+            self.message = json.dumps(t)
         
         #print(self.message)
         return self.message
