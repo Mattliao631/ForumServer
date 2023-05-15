@@ -23,11 +23,12 @@ class ConnectionThread(threading.Thread):
                     connection_pool.pop(self.address)
                     break
                 #print(type(message))
-                #print("Receive from ", self.address, "message: ", message)
+                print("Receive from ", self.address, "message: ", message)
                 Received_Message = json.loads(message)
                 FIH_obj = ForumInstructionHandler(Received_Message)
                 Retured_Message = FIH_obj.handle()
-                self.connection.send(Retured_Message)
+                self.connection.send(Retured_Message.encode())
+                print("Sent to ", self.address, "message: ", Retured_Message)
             except Exception as e:
                 print(e)
                 print(self.address, " disconnected.")
@@ -58,7 +59,7 @@ connection_pool = {}
 
 # Socket initialization begin
 HOST = '0.0.0.0'
-PORT = 7000
+PORT = 9000
 ADDR = (HOST, PORT)
 
 socket_obj = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
