@@ -50,10 +50,10 @@ class ForumDatabaseCommunicator:
                 ''' %(new_id)
             )
             self.database_connection.commit()
-            t = '''{"Message" : "Sign up 0", "Datas" : ""}'''
+            t = '''{"Message" : "Sign up 0", "Datas" : {}}'''
             self.message = json.dumps(t)
         else:
-            t = '''{'Message" : "Sign up 1", "Datas" : ""}'''
+            t = '''{'Message" : "Sign up 1", "Datas" : {}}'''
             self.message = json.dumps(t)
         
         #print(self.message)
@@ -70,20 +70,23 @@ class ForumDatabaseCommunicator:
         )
         temp = self.cursor_obj.fetchall()
         if not temp:
-            t = {"Message" : "Sign in 1", "Datas" : ""}
+            t = {"Message" : "Sign in 1", "Datas" : {}}
             self.message = json.dumps(t)
         else:
             id = temp[0][0]
             self.cursor_obj.execute(
                 '''
-                    SELECT Title, ArticleID, PortraitID
+                    SELECT Title, PortraitID, ArticleID
                     FROM Article, User
                     WHERE Article.AuthorID==User.UserID
                     ORDER BY Article.Created_At DESC LIMIT 10;
                 '''
             )
             article_temp = self.cursor_obj.fetchall()
-            t = {"Message" : "Sign in 0", "Datas" : article_temp}
+            dict_list = []
+            for article_tuple in article_temp:
+                dict_list.append({"Title" : article_tuple[0], "PortraitID" : article_tuple[1], "ArticleID" : article_tuple[2]})
+            t = {"Message" : "Sign in 0", "Datas" : {"UserID": temp[0][0], "Articles" : dict_list}}
             self.message = json.dumps(t)
 
         #print(self.message)
@@ -108,13 +111,16 @@ class ForumDatabaseCommunicator:
         self.cursor_obj.execute(query_str)
         result_tuples = self.cursor_obj.fetchall()
         
-        print(result_tuples)
-        
+        #print(result_tuples)
+
         if not result_tuples:
-            t = {"Message" : "Search 1", "Datas" : []}
+            t = {"Message" : "Search 1", "Datas" : {}}
             self.message = json.dumps(t)
         else:
-            t = {"Message" : "Search 0", "Datas" : result_tuples}
+            dict_list = []
+            for result_tuple in result_tuples:
+                dict_list.append({"Title" : result_tuple[0], "Author" : result_tuple[1], "ArticleID" : result_tuple[2]})
+            t = {"Message" : "Search 0", "Datas" : {"Articles" : dict_list}}
             self.message = json.dumps(t)
 
         #print(self.message)
@@ -200,7 +206,7 @@ class ForumDatabaseCommunicator:
         self.cursor_obj.execute(query_str)
         self.database_connection.commit()
     
-        t = {"Message" : "Post Article 0", "Datas" : ""}
+        t = {"Message" : "Post Article 0", "Datas" : {}}
         self.message = json.dumps(t)
         return self.message
     
@@ -217,8 +223,9 @@ class ForumDatabaseCommunicator:
         self.cursor_obj.execute("SELECT COUNT(UserID) FROM Liked_By WHERE ArticleID==%d" %ArticleID)
         likenum=self.cursor_obj.fetchone()[0]
         article_data.append(likenum)
+
         #print(article_data)
-        bundle_data = [article_data]
+        dict_list = []
         self.cursor_obj.execute(
             '''
                 SELECT DISTINCT Comment.CommentID, Comment.Content, Comment.CommenterID, User.Name
@@ -228,10 +235,24 @@ class ForumDatabaseCommunicator:
             ''' %(ArticleID)
         )
         comment_temp = self.cursor_obj.fetchall()
-        for comment_tuple in comment_temp:
-            bundle_data.append(comment_tuple)
 
-        t = {"Message" : "View Article 0", "Datas" : bundle_data}
+        for comment_tuple in comment_temp:
+            dict_list.append({"CommentID" : comment_tuple[0], "Content" : comment_tuple[1], "CommenterID" : comment_tuple[2], "CommenterName" : comment_tuple[3]})
+        
+        t = {
+                "Message" : "View Article 0",
+                "Datas" : {
+                        "Article" : {
+                            "Title" : article_data[0],
+                            "ArticleID" : article_data[1],
+                            "Content" : article_data[2],
+                            "AuthorID" : article_data[3],
+                            "AuthorName" : article_data[4],
+                            "Star_Number" : article_data[5]
+                        },
+                        "Comments" : dict_list
+                }
+            }
         self.message = json.dumps(t)
 
         return self.message
@@ -247,7 +268,7 @@ class ForumDatabaseCommunicator:
             ''' % (ArticleID, new_id, time.strftime("%Y/%m/%d, %H/%M/%S"), UserID, Content)
         )
         self.database_connection.commit()
-        t = {"Message" : "Comment 0", "Datas" : ""}
+        t = {"Message" : "Comment 0", "Datas" : {}}
         self.message = json.dumps(t)
         return self.message
     
@@ -290,14 +311,14 @@ class ForumDatabaseCommunicator:
                     ''' %(Amount, pet_temp[1], pet_temp[0])
                 )
                 self.database_connection.commit()
-                t = {"Message" : "Donate 0", "Datas" : "%d" %(cookie - Amount)}
+                t = {"Message" : "Donate 0", "Datas" : {"Rest": cookie - Amount}}
                 self.message = json.dumps(t)
             else:
-                t = {"Message" : "Donate 1", "Datas" : "%d" %(cookie)}
+                t = {"Message" : "Donate 1", "Datas" : {"Rest": cookie}}
                 self.message = json.dumps(t)
             
         else:
-            t = {"Message" : "Donate 1", "Datas" : "-1"}
+            t = {"Message" : "Donate 1", "Datas" : {}}
             self.message = json.dumps(t)
         
         #print(self.message)
@@ -310,11 +331,11 @@ class ForumDatabaseCommunicator:
         query_str = ''
         if temp == None:
             query_str = "INSERT INTO Liked_By (ArticleID, UserID) VALUES (%d, %d)" %(ArticleID, UserID)
-            t = {"Message" : "Star 0", "Datas" : ""}
+            t = {"Message" : "Star 0", "Datas" : {"Status" : "Star"}}
             self.message = json.dumps(t)
         else:
             query_str = "DELETE FROM Liked_By WHERE ArticleID==%d AND UserID==%d" %(ArticleID, UserID)
-            t = {"Message" : "Star 0", "Datas" : "Unstar"}
+            t = {"Message" : "Star 0", "Datas" : {"Status" : "UnStar"}}
             self.message = json.dumps(t)
         
         self.cursor_obj.execute(query_str)
@@ -331,7 +352,19 @@ class ForumDatabaseCommunicator:
             ''' %(UserID)
         )
         temp = self.cursor_obj.fetchone()
-        t = {"Message" : "View User 0", "Datas" : temp}
+        t = {
+            "Message" : "View User 0",
+            "Datas" : {
+                "UserID" : temp[0],
+                "Name" : temp[1],
+                "Introduction" : temp[2],
+                "PortraitID" : temp[3],
+                "PetID" : temp[4],
+                "PetName" : temp[5],
+                "PetStage" : temp[6],
+                "PetExp" : temp[7]
+            }
+        }
         self.message = json.dumps(t)
         return self.message
     
@@ -345,7 +378,7 @@ class ForumDatabaseCommunicator:
             ''' %(NewName, UserID)
         )
         self.database_connection.commit()
-        t = {"Message" : "Change User Name 0", "Datas" : ""}
+        t = {"Message" : "Change User Name 0", "Datas" : {}}
         self.message = json.dumps(t)
         return self.message
 
@@ -360,7 +393,7 @@ class ForumDatabaseCommunicator:
         )
         self.database_connection.commit()
 
-        t = {"Message" : "Change Self Introduction 0", "Datas" : ""}
+        t = {"Message" : "Change Self Introduction 0", "Datas" : {}}
         self.message = json.dumps(t)
         return self.message
     
@@ -375,7 +408,7 @@ class ForumDatabaseCommunicator:
         )
         self.database_connection.commit()
 
-        t = {"Message" : "Change Portrait 0", "Datas" : ""}
+        t = {"Message" : "Change Portrait 0", "Datas" : {}}
         self.message = json.dumps(t)
         return self.message
     
@@ -388,12 +421,12 @@ Pet_ExpLimit_on_EachStage = [300, 4000]
 if __name__ == "__main__":
     FDC_obj = ForumDatabaseCommunicator("Forum_Database.db")
     #print(FDC_obj.CreateUser(name="T_T", password="Professor Hung is ultimate boss of CSIE", mail="91011112", time=datetime.datetime.now()))
-    #print(FDC_obj.SignIn("1234", "4568"))
+    #print(FDC_obj.SignIn("123", "456"))
     #print(FDC_obj.Search(big_category='Test2', sub_category='Test2-0',tags=('Test1', 'Test2')))
     #print(FDC_obj.Post(Title='PythoPosTes', Content='C8763++++++++++++++asdflvnbsdlfkasdfvds;jv asf aa', Time=datetime.datetime.now(), AuthorID=0,BigCategory='Test2', SubCategory='Test2-0', Tags=('Test1', 'Test2', 'RenameTest', 'NewTagTest')))
     #print(FDC_obj.ViewArticle(4))
     #print(FDC_obj.Comment(4, 1, 'ER model', datetime.datetime.now()))
-    #print(FDC_obj.Donate(UserID=1, Amount=50, AuthorID=0))
+    #print(FDC_obj.Donate(UserID=1, Amount=1, AuthorID=0))
     #print(FDC_obj.Star(UserID=1, ArticleID=3))
     #print(FDC_obj.ViewUser(3))
     #print(FDC_obj.ChangeUserName(3, 'Force us taking complier is nonsense!'))
